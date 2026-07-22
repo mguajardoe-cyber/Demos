@@ -84,7 +84,7 @@
     filter:brightness(0);opacity:.08;
   }
   .table-head,.table-body{position:relative;z-index:1;}
-  .table-columns{display:grid;grid-template-columns:6px 13% 16% 27% 13% 1fr;column-gap:1.2vw;}
+  .table-columns{display:grid;grid-template-columns:6px 14% 18% 1fr 20%;column-gap:1.2vw;}
   .table-head{flex:0 0 auto;padding:0 1.3vw;border-bottom:2px solid var(--border);background:#fbfcfe;}
   .table-head>div{font-size:1.15vh;text-transform:uppercase;letter-spacing:.05em;
     color:var(--text-dim);font-weight:700;padding:1.15vh 0;}
@@ -92,7 +92,7 @@
   .table-row{border-bottom:1px solid var(--border);}
   .table-row:last-child{border-bottom:none;}
   .table-row>div{min-width:0;display:flex;height:100%;}
-  .table-row .col-accent,.table-row .col-cat,.table-row .col-lugar{align-items:center;}
+  .table-row .col-accent,.table-row .col-cat{align-items:center;}
   .accent-bar{width:6px;height:64%;border-radius:3px;}
   .cat-tag{display:inline-block;font-size:1.15vh;font-weight:600;padding:.4vh .85vw;
     border-radius:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
@@ -102,13 +102,21 @@
   .col-desc{align-items:center;}
   .desc{font-size:1.6vh;color:var(--text);line-height:1.35;display:-webkit-box;
     -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-  .lugar{font-size:1.55vh;font-weight:600;}
-  .col-dias{flex-direction:column;justify-content:center;gap:.5vh;}
-  .dias-num{font-family:var(--font-mono);font-weight:700;font-size:1.9vh;}
-  .dias-track{position:relative;width:100%;height:1.1vh;border-radius:1vh;background:#eef0f5;}
-  .dias-fill{position:absolute;top:0;bottom:0;border-radius:1vh;}
-  .dias-scale{display:flex;justify-content:space-between;font-size:1vh;
-    color:var(--text-dim);font-family:var(--font-mono);}
+  .col-dias{align-items:center;flex-direction:column;justify-content:center;gap:.5vh;}
+  .dias-num{font-family:var(--font-mono);font-weight:700;font-size:2.1vh;}
+  .dias-pair{display:flex;align-items:center;gap:.9vw;}
+  .dias-item{display:flex;flex-direction:column;align-items:center;gap:.15vh;line-height:1.1;}
+  .dias-item .dias-label{font-size:.85vh;color:var(--text-dim);text-transform:uppercase;
+    letter-spacing:.05em;font-weight:600;font-family:var(--font-body);}
+  .dias-item .dias-val{font-family:var(--font-mono);font-weight:700;font-size:2.1vh;}
+  .dias-divider{width:1px;height:2.4vh;background:var(--border);flex-shrink:0;}
+
+  .lugar-header{display:flex;align-items:center;gap:.7vw;padding:1vh 0 .5vh;
+    font-family:var(--font-display);font-weight:600;font-size:1.6vh;color:var(--text);
+    text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border);}
+  .lugar-header .lugar-dot{width:1vh;height:1vh;border-radius:50%;flex-shrink:0;}
+  .lugar-header .lugar-count{font-family:var(--font-mono);font-weight:600;color:var(--text-dim);
+    text-transform:none;letter-spacing:0;font-size:1.3vh;}
 
   .grid-stage{background:var(--card);border:1px solid var(--border);border-radius:14px;
     box-shadow:var(--shadow);height:100%;padding:1.8vh 1.6vw;display:grid;
@@ -236,41 +244,71 @@ function segmentos(eq){
   return eq.segmentos || [];
 }
 
+const MESES_NUM = {"Enero":1,"Febrero":2,"Marzo":3,"Abril":4,"Mayo":5,"Junio":6,"Julio":7,
+  "Agosto":8,"Septiembre":9,"Octubre":10,"Noviembre":11,"Diciembre":12};
+const MES_ACTUAL_NUM = MESES_NUM[DATA.mes] || 1;
+function fechaDDMM(dia){
+  return `${String(dia).padStart(2,'0')}/${String(MES_ACTUAL_NUM).padStart(2,'0')}`;
+}
+
 function diasCell(segs, color){
   if(!segs.length){
     return `<div class="dias-num" style="color:${color}">—</div>`;
   }
-  const label = segs.map(s => s.inicio===s.fin ? `Día ${s.inicio}` : `Día ${s.inicio}–${s.fin}`).join(', ');
-  const fills = segs.map(s => {
-    const left = ((s.inicio-1)/DATA.num_dias*100).toFixed(1);
-    const rawWidth = (s.fin-s.inicio+1)/DATA.num_dias*100;
-    const width = Math.max(rawWidth, 4).toFixed(1);
-    return `<span class="dias-fill" style="left:${left}%;width:${width}%;background:${color}"></span>`;
-  }).join('');
-  return `<div class="dias-num" style="color:${color}">${label}</div>
-    <div class="dias-track">${fills}</div>
-    <div class="dias-scale"><span>1</span><span>${DATA.num_dias}</span></div>`;
+  return segs.map(s => `<div class="dias-pair">
+    <div class="dias-item"><span class="dias-label">Fecha de Inicio</span><span class="dias-val" style="color:${color}">${fechaDDMM(s.inicio)}</span></div>
+    <div class="dias-divider"></div>
+    <div class="dias-item"><span class="dias-label">Fecha de Término</span><span class="dias-val" style="color:${color}">${fechaDDMM(s.fin)}</span></div>
+  </div>`).join('');
+}
+
+function lugarDe(eq){
+  const segs = segmentos(eq);
+  return [...new Set(segs.map(s=>s.lugar))].join(' + ') || 'Sin lugar asignado';
+}
+
+// Agrupa por lugar (preservando el orden de primera aparición de cada lugar)
+// sin romper el orden original dentro de cada grupo.
+function ordenarPorLugar(items){
+  const orden = [];
+  const vistos = new Set();
+  items.forEach(eq => {
+    const l = lugarDe(eq);
+    if(!vistos.has(l)){ vistos.add(l); orden.push(l); }
+  });
+  const rank = new Map(orden.map((l,i) => [l,i]));
+  return [...items].sort((a,b) => rank.get(lugarDe(a)) - rank.get(lugarDe(b)));
 }
 
 function tableSlideHTML(estado, items){
   const color = COLORS[estado].c, soft = COLORS[estado].soft;
-  const rows = items.map(eq => {
+  let lastLugar = null;
+  const rowSizes = [];
+  const rowsHTML = items.map(eq => {
+    const lugar = lugarDe(eq);
     const segs = segmentos(eq);
-    const lugares = [...new Set(segs.map(s=>s.lugar))].join(' + ') || '—';
-    return `<div class="table-row table-columns">
+    let header = '';
+    if(lugar !== lastLugar){
+      lastLugar = lugar;
+      const total = items.filter(x => lugarDe(x) === lugar).length;
+      rowSizes.push('auto');
+      header = `<div class="lugar-header"><span class="lugar-dot" style="background:${color}"></span>${lugar}
+        <span class="lugar-count">· ${total} equipo${total===1?'':'s'}</span></div>`;
+    }
+    rowSizes.push('1fr');
+    return header + `<div class="table-row table-columns">
       <div class="col-accent"><span class="accent-bar" style="background:${color}"></span></div>
       <div class="col-cat"><span class="cat-tag" style="background:${soft};color:${color}">${eq.categoria||''}</span></div>
       <div class="col-equipo"><div class="modelo">${eq.modelo||''}</div><div class="serie">${eq.numero_serie||''}</div></div>
       <div class="col-desc"><div class="desc">${eq.descripcion||''}</div></div>
-      <div class="col-lugar"><div class="lugar">${lugares}</div></div>
       <div class="col-dias">${diasCell(segs, color)}</div>
     </div>`;
   }).join('');
   return `<div class="card-table">
     <div class="table-head table-columns">
-      <div></div><div>Categoría</div><div>Equipo</div><div>Descripción</div><div>Lugar</div><div>Días del mes</div>
+      <div></div><div>Categoría</div><div>Equipo</div><div>Descripción</div><div>Días del mes</div>
     </div>
-    <div class="table-body" style="grid-template-rows:repeat(${items.length},1fr)">${rows}</div>
+    <div class="table-body" style="grid-template-rows:${rowSizes.join(' ')}">${rowsHTML}</div>
   </div>`;
 }
 
@@ -285,8 +323,9 @@ function gridSlideHTML(items){
 
 const slidesDatos = [];
 ESTADOS.forEach(estado => {
-  const items = DATA.buckets[estado] || [];
+  let items = DATA.buckets[estado] || [];
   if (items.length === 0) return;
+  if (estado !== "Disponible") items = ordenarPorLugar(items);
   const perSlide = estado === "Disponible" ? GRID_ITEMS_PER_SLIDE : TABLE_ROWS_PER_SLIDE;
   const totalPages = Math.ceil(items.length / perSlide);
   for (let i=0; i<items.length; i+=perSlide){
